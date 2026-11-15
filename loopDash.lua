@@ -14,60 +14,60 @@ local sessionId = math.random(100000, 999999)
 getgenv().uppercutDetectorId = sessionId
 
 local config = {
-    enabled = true,
-    debugAnim = false,
-    cooldownEnabled = true,
-    dashDelay = 0.23,
-    dashWait = 0,
-    dashRetry = 0.06,
-    dashCooldown = 5.0,
+             enabled = true,
+           debugAnim = false,
+     cooldownEnabled = true,
+           dashDelay = 0.23,
+            dashWait = 0,
+           dashRetry = 0.06,
+        dashCooldown = 5.0,
 
-    loopDelay = 0.3,
-    loopDuration = 0.6,
-    speed = 60,
-    jumpDelay = 0.3,
-    jumpForce = 51,
-    gyroTorque = 1000000,
-    gyroP = 30000,
-    gyroD = 500,
-    moveMode = "cframe",
-    maxStep = 2.5,
-    smoothSpeed = 20,
-    lockAutoRotate = true,
+           loopDelay = 0.3,
+        loopDuration = 0.6,
+               speed = 60,
+           jumpDelay = 0.3,
+           jumpForce = 51,
+          gyroTorque = 1000000,
+               gyroP = 30000,
+               gyroD = 500,
+            moveMode = "cframe",
+             maxStep = 2.5,
+         smoothSpeed = 20,
+      lockAutoRotate = true,
     usePlatformStand = false,
-    noclipEnabled = true,
-    noclipRange = 8,
+       noclipEnabled = true,
+         noclipRange = 8,
 
-    hotkey = Enum.KeyCode.V,
+              hotkey = Enum.KeyCode.V,
 
-    camSmooth = true,
-    camSmoothDelay = 0,
-    camDuration = 1.5,
+           camSmooth = true,
+      camSmoothDelay = 0,
+          camDuration = 1.5,
 
-    guiTitle = "Loop Dash",
-    guiAuthor = "Techinified",
+             guiTitle = "Loop Dash",
+            guiAuthor = "Techinified",
 }
 
 local uppercutAnimIds = {
-    ["10503381238"] = true,
+      ["10503381238"] = true,
 }
 
 local dashAnimIds = {
-    ["10479335397"] = true,
-    ["10491993682"] = true,
-    ["13380255751"] = true,
+  ["10479335397"] = true,
+  ["10491993682"] = true,
+  ["13380255751"] = true,
 }
 
 local theme = {
-            bg = Color3.fromRGB(15, 15, 14),
-          well = Color3.fromRGB(10, 10, 10),
-        raised = Color3.fromRGB(28, 28, 26),
-          line = Color3.fromRGB(38, 37, 34),
-    lineStrong = Color3.fromRGB(66, 64, 58),
-          text = Color3.fromRGB(233, 230, 222),
-         muted = Color3.fromRGB(131, 127, 118),
-           dim = Color3.fromRGB(96, 93, 86),
-        accent = Color3.fromRGB(255, 88, 48),
+         bg = Color3.fromRGB(15, 15, 14),
+       well = Color3.fromRGB(10, 10, 10),
+     raised = Color3.fromRGB(28, 28, 26),
+       line = Color3.fromRGB(38, 37, 34),
+ lineStrong = Color3.fromRGB(66, 64, 58),
+       text = Color3.fromRGB(233, 230, 222),
+      muted = Color3.fromRGB(131, 127, 118),
+        dim = Color3.fromRGB(96, 93, 86),
+     accent = Color3.fromRGB(255, 88, 48),
 }
 
 local function pickFont(name, fallback)
