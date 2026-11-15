@@ -18,7 +18,7 @@ local config = {
            debugAnim = false,
      cooldownEnabled = true,
            dashDelay = 0.23,
-            dashWait = 0,
+            dashWait = 0.6,
            dashRetry = 0.06,
         dashCooldown = 5.0,
 
