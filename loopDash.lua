@@ -43,6 +43,8 @@ local config = {
            camSmooth = true,
       camSmoothDelay = 0,
           camDuration = 1.5,
+      camReleaseOnHit = true,
+         camHitRadius = 12,
 
              guiTitle = "Loop Dash",
             guiAuthor = "Techinified",
@@ -136,6 +138,44 @@ local camDashStartTime = 0
 local camAttached = false
 local camPrevSubject = nil
 local camDashId = 0
+local camHealthSnapshot = {}
+local camHitParams = OverlapParams.new()
+camHitParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- samples: array of { humanoid = key, health = number }. Returns the first sample
+-- whose health fell since the previous snapshot, and the snapshot for the next call.
+-- Humanoids missing from `samples` are dropped from the snapshot, so one that leaves
+-- the radius and comes back damaged is not reported as a hit.
+local function findHealthDrop(previousSnapshot, samples)
+    local nextSnapshot = {}
+    local drop = nil
+    for _, sample in ipairs(samples) do
+        local previous = previousSnapshot[sample.humanoid]
+        if drop == nil and previous ~= nil and sample.health < previous then
+            drop = { humanoid = sample.humanoid, previous = previous, health = sample.health }
+        end
+        nextSnapshot[sample.humanoid] = sample.health
+    end
+    return drop, nextSnapshot
+end
+
+local function scanForHit(character, root)
+    camHitParams.FilterDescendantsInstances = { character }
+    local samples = {}
+    local seen = {}
+    local parts = workspace:GetPartBoundsInRadius(root.Position, config.camHitRadius, camHitParams)
+    for _, part in ipairs(parts) do
+        local model = part:FindFirstAncestorOfClass("Model")
+        local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+        if humanoid and not seen[humanoid] then
+            seen[humanoid] = true
+            table.insert(samples, { humanoid = humanoid, health = humanoid.Health })
+        end
+    end
+    local drop, nextSnapshot = findHealthDrop(camHealthSnapshot, samples)
+    camHealthSnapshot = nextSnapshot
+    return drop
+end
 
 local function restoreCamera()
     if not camAttached then
@@ -185,6 +225,17 @@ local function updateCamSmooth(isEnabled)
                 return
             end
 
+            if camExecuting and config.camReleaseOnHit then
+                local hit = scanForHit(character, root)
+                if hit then
+                    camExecuting = false
+                    if config.debugAnim then
+                        local model = hit.humanoid.Parent
+                        print("[loopDash] camera released on hit:", model and model.Name, hit.previous, "->", hit.health)
+                    end
+                end
+            end
+
             local elapsed = os.clock() - camDashStartTime
             local inSmoothWindow = camExecuting
                 and elapsed >= config.camSmoothDelay
@@ -212,11 +263,13 @@ end
 
 local function camOnDashEnd()
     camExecuting = false
+    camHealthSnapshot = {}
     updateCamSmooth(false)
 end
 
 local function camOnDashStart()
     camExecuting = true
+    camHealthSnapshot = {}
     camDashStartTime = os.clock()
     camDashId = camDashId + 1
     local dashId = camDashId
@@ -1143,6 +1196,11 @@ local function buildUI()
     end, seconds), function()
         return not config.camSmooth
     end)
+    makeToggle(settingsPage, "Release On Hit", function()
+        return config.camReleaseOnHit
+    end, function(value)
+        config.camReleaseOnHit = value
+    end)
 
     makeSection(settingsPage, "MOTION")
     makeSlider(settingsPage, "Jump Force", 0, 100, 1, function()
@@ -1247,6 +1305,7 @@ local function buildUI()
         {key = "camSmooth", kind = "boolean"},
         {key = "camSmoothDelay", kind = "number", min = 0, max = 1},
         {key = "camDuration", kind = "number", min = 0.2, max = 3},
+        {key = "camReleaseOnHit", kind = "boolean"},
         {key = "hotkey", kind = "keycode"},
     }
 
