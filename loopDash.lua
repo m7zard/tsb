@@ -27,9 +27,6 @@ local config = {
                speed = 60,
            jumpDelay = 0.3,
            jumpForce = 51,
-          gyroTorque = 1000000,
-               gyroP = 30000,
-               gyroD = 500,
             moveMode = "cframe",
              maxStep = 2.5,
          smoothSpeed = 20,
@@ -289,6 +286,19 @@ local function rotateAroundY(vector, angle)
     return CFrame.Angles(0, angle, 0):VectorToWorldSpace(vector)
 end
 
+-- Turns `cframe` about the world Y axis so its flat look direction matches `direction`;
+-- position and pitch/roll are kept. Returns `cframe` unchanged if either direction is degenerate.
+local function faceDirection(cframe, direction)
+    local look = flatten(cframe.LookVector)
+    local target = flatten(direction)
+    if look.Magnitude <= 0.001 or target.Magnitude <= 0.001 then
+        return cframe
+    end
+    local turn = CFrame.lookAt(Vector3.zero, target) * CFrame.lookAt(Vector3.zero, look):Inverse()
+    local position = cframe.Position
+    return CFrame.new(position) * turn * (cframe - position)
+end
+
 local function stopPattern()
     local run = activeRun
     if not run then
@@ -298,12 +308,6 @@ local function stopPattern()
 
     disconnectSafe(run.renderConnection)
     disconnectSafe(run.steppedConnection)
-
-    if run.gyro then
-        pcall(function()
-            run.gyro:Destroy()
-        end)
-    end
 
     for part, originalCanCollide in pairs(run.noclipParts) do
         pcall(function()
@@ -380,19 +384,6 @@ local function startPattern(character, humanoid, rootPart)
         end
     end)
 
-    local gyroOk, gyro = pcall(function()
-        local bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.MaxTorque = Vector3.new(0, config.gyroTorque, 0)
-        bodyGyro.P = config.gyroP
-        bodyGyro.D = config.gyroD
-        bodyGyro.CFrame = rootPart.CFrame
-        bodyGyro.Parent = rootPart
-        return bodyGyro
-    end)
-    if gyroOk then
-        run.gyro = gyro
-    end
-
     if config.noclipEnabled then
         local overlapParams = OverlapParams.new()
         overlapParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -441,9 +432,7 @@ local function startPattern(character, humanoid, rootPart)
             end
 
             local desiredVelocity = getPatternVelocity(run, run.elapsed)
-            if run.gyro then
-                run.gyro.CFrame = CFrame.lookAt(Vector3.zero, desiredVelocity)
-            end
+            rootPart.CFrame = faceDirection(rootPart.CFrame, desiredVelocity)
             local alpha = 1 - math.exp(-config.smoothSpeed * dt)
             run.velocity = run.velocity:Lerp(desiredVelocity, alpha)
 
