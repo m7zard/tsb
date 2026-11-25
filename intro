@@ -1,0 +1,509 @@
+local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+ 
+local Config = {
+	CoreUrl = "https://pastee.dev/r/e1pyWIUF/0"
+	SoundUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/Epikk_Braindead_mp3.mp3",
+	ImageUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7923.png",
+	Keys = {
+"ThanksForExecutingMyHub",
+"DeveloperKey_07.11",
+},
+	CaseSensitive = true,
+	MaskKey = true,
+	ShowSeconds = 10,
+	SoundVolume = 1,
+}
+ 
+if getgenv().techinifiedLoaderCleanup then
+	pcall(getgenv().techinifiedLoaderCleanup)
+end
+ 
+local function isPlaceholder(url)
+	return type(url) ~= "string" or url == "" or url:find("PASTE_RAW_LINK", 1, true) ~= nil
+end
+ 
+local function guiParent()
+	if type(gethui) == "function" then
+		local ok, container = pcall(gethui)
+		if ok and container then
+			return container
+		end
+	end
+	return CoreGui
+end
+ 
+local function create(className, properties, children)
+	local instance = Instance.new(className)
+	for key, value in pairs(properties) do
+		if key ~= "Parent" then
+			instance[key] = value
+		end
+	end
+	for _, child in ipairs(children or {}) do
+		child.Parent = instance
+	end
+	instance.Parent = properties.Parent
+	return instance
+end
+ 
+local function corner(radius)
+	return create("UICorner", {CornerRadius = UDim.new(0, radius)})
+end
+ 
+local function tween(instance, duration, properties, style)
+	local info = TweenInfo.new(duration, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local playing = TweenService:Create(instance, info, properties)
+	playing:Play()
+	return playing
+end
+ 
+local tempFiles = {}
+local assets = {Sound = nil, Image = nil, Done = false}
+ 
+local function fetchAsset(url, fileName)
+	if isPlaceholder(url) or type(writefile) ~= "function" or type(getcustomasset) ~= "function" then
+		return nil
+	end
+	local ok, data = pcall(game.HttpGet, game, url)
+	if not ok or type(data) ~= "string" or #data == 0 then
+		return nil
+	end
+	if not pcall(writefile, fileName, data) then
+		return nil
+	end
+	tempFiles[#tempFiles + 1] = fileName
+	local gotAsset, asset = pcall(getcustomasset, fileName)
+	if gotAsset then
+		return asset
+	end
+	return nil
+end
+ 
+task.spawn(function()
+	assets.Sound = fetchAsset(Config.SoundUrl, "TechinifiedLoader_intro.mp3")
+	assets.Image = fetchAsset(Config.ImageUrl, "TechinifiedLoader_intro.png")
+	assets.Done = true
+end)
+ 
+local gui = create("ScreenGui", {
+	Name = "TechinifiedLoader",
+	IgnoreGuiInset = true,
+	ResetOnSpawn = false,
+	DisplayOrder = 10000,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	Parent = guiParent(),
+})
+ 
+local black = create("Frame", {
+	Name = "Black",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BorderSizePixel = 0,
+	Active = true,
+	Parent = gui,
+})
+ 
+local chat = create("CanvasGroup", {
+	Name = "Chat",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	ZIndex = 2,
+	Parent = gui,
+})
+ 
+local column = create("Frame", {
+	Name = "Column",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromScale(0.5, 0),
+	Size = UDim2.fromScale(0.92, 1),
+	BackgroundTransparency = 1,
+	Parent = chat,
+}, {
+	create("UISizeConstraint", {MaxSize = Vector2.new(560, math.huge)}),
+	create("UIPadding", {
+		PaddingTop = UDim.new(0, 18),
+		PaddingBottom = UDim.new(0, 14),
+	}),
+})
+ 
+local thread = create("Frame", {
+	Name = "Thread",
+	Size = UDim2.new(1, 0, 1, -58),
+	BackgroundTransparency = 1,
+	ClipsDescendants = true,
+	Parent = column,
+}, {
+	create("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		Padding = UDim.new(0, 12),
+	}),
+})
+ 
+local inputBar = create("CanvasGroup", {
+	Name = "InputBar",
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.fromScale(0, 1),
+	Size = UDim2.new(1, 0, 0, 46),
+	BackgroundColor3 = Color3.fromRGB(22, 22, 26),
+	GroupTransparency = 1,
+	Visible = false,
+	Parent = column,
+}, {
+	corner(23),
+	create("UIStroke", {
+		Color = Color3.fromRGB(70, 70, 78),
+		Thickness = 1,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}),
+})
+ 
+local box = create("TextBox", {
+	Name = "Box",
+	Position = UDim2.fromOffset(18, 0),
+	Size = UDim2.new(1, -92, 1, 0),
+	BackgroundTransparency = 1,
+	Text = "",
+	PlaceholderText = "Type your key...",
+	PlaceholderColor3 = Color3.fromRGB(120, 120, 128),
+	TextColor3 = Color3.fromRGB(240, 240, 244),
+	TextSize = 16,
+	Font = Enum.Font.GothamMedium,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ClearTextOnFocus = false,
+	TextEditable = false,
+	Parent = inputBar,
+})
+ 
+local send = create("TextButton", {
+	Name = "Send",
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -6, 0.5, 0),
+	Size = UDim2.fromOffset(62, 34),
+	BackgroundColor3 = Color3.fromRGB(228, 228, 232),
+	AutoButtonColor = true,
+	Text = "Send",
+	TextColor3 = Color3.fromRGB(12, 12, 14),
+	TextSize = 14,
+	Font = Enum.Font.GothamBold,
+	Parent = inputBar,
+}, {corner(17)})
+ 
+local connections = {}
+local destroyed = false
+local activeSound = nil
+local rowOrder = 0
+ 
+local function lift()
+	local amount = 0
+	if UIS.OnScreenKeyboardVisible then
+		amount = UIS.OnScreenKeyboardSize.Y
+	end
+	chat.Size = UDim2.new(1, 0, 1, -amount)
+end
+ 
+connections[#connections + 1] = UIS:GetPropertyChangedSignal("OnScreenKeyboardVisible"):Connect(lift)
+connections[#connections + 1] = UIS:GetPropertyChangedSignal("OnScreenKeyboardSize"):Connect(lift)
+ 
+local function newBubble(sender, text)
+	rowOrder += 1
+	local fromClient = sender == "Client"
+ 
+	local row = create("Frame", {
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = rowOrder,
+		Parent = thread,
+	})
+ 
+	local holder = create("Frame", {
+		AnchorPoint = Vector2.new(fromClient and 1 or 0, 0),
+		Position = UDim2.fromScale(fromClient and 1 or 0, 0),
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		Parent = row,
+	}, {
+		create("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			HorizontalAlignment = fromClient and Enum.HorizontalAlignment.Right or Enum.HorizontalAlignment.Left,
+			Padding = UDim.new(0, 4),
+		}),
+		create("UISizeConstraint", {MaxSize = Vector2.new(380, math.huge)}),
+	})
+ 
+	local header = create("TextLabel", {
+		LayoutOrder = 1,
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		Text = os.date("[%H:%M] ") .. sender,
+		TextColor3 = Color3.fromRGB(125, 125, 135),
+		TextSize = 12,
+		Font = Enum.Font.GothamMedium,
+		TextTransparency = 1,
+		Parent = holder,
+	})
+ 
+	local bubble = create("TextLabel", {
+		LayoutOrder = 2,
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundColor3 = fromClient and Color3.fromRGB(228, 228, 232) or Color3.fromRGB(26, 26, 31),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextColor3 = fromClient and Color3.fromRGB(12, 12, 14) or Color3.fromRGB(240, 240, 244),
+		TextSize = 16,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Font = Enum.Font.GothamMedium,
+		TextTransparency = 1,
+		Parent = holder,
+	}, {
+		corner(16),
+		create("UIPadding", {
+			PaddingTop = UDim.new(0, 9),
+			PaddingBottom = UDim.new(0, 9),
+			PaddingLeft = UDim.new(0, 14),
+			PaddingRight = UDim.new(0, 14),
+		}),
+	})
+ 
+	local stroke = nil
+	if not fromClient then
+		stroke = create("UIStroke", {
+			Color = Color3.fromRGB(72, 72, 80),
+			Thickness = 1,
+			Transparency = 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Parent = bubble,
+		})
+	end
+ 
+	tween(header, 0.3, {TextTransparency = 0})
+	tween(bubble, 0.3, {BackgroundTransparency = 0, TextTransparency = 0})
+	if stroke then
+		tween(stroke, 0.3, {Transparency = 0})
+	end
+ 
+	return row, bubble
+end
+ 
+local function showTyping(duration)
+	local row, bubble = newBubble("Executor", ".")
+	local started = os.clock()
+	local frame = 0
+	while os.clock() - started < duration and not destroyed do
+		frame = frame % 3 + 1
+		bubble.Text = string.rep(".", frame)
+		task.wait(0.3)
+	end
+	row:Destroy()
+end
+ 
+local function say(sender, text, typingTime)
+	if typingTime and typingTime > 0 then
+		showTyping(typingTime)
+	end
+	return newBubble(sender, text)
+end
+ 
+local function playMoment()
+	local waited = 0
+	while not assets.Done and waited < 8 do
+		task.wait(0.1)
+		waited += 0.1
+	end
+ 
+	local image = nil
+	if assets.Sound then
+		activeSound = create("Sound", {
+			SoundId = assets.Sound,
+			Volume = Config.SoundVolume,
+			Looped = false,
+			Parent = game:GetService("SoundService"),
+		})
+		activeSound:Play()
+	end
+	if assets.Image then
+		image = create("ImageLabel", {
+			Name = "Intro",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.55, 0.75),
+			BackgroundTransparency = 1,
+			Image = assets.Image,
+			ScaleType = Enum.ScaleType.Fit,
+			ImageTransparency = 1,
+			ZIndex = 10,
+			Parent = gui,
+		})
+		tween(image, 0.35, {ImageTransparency = 0})
+	end
+	tween(chat, 0.35, {GroupTransparency = 0.8})
+ 
+	if activeSound or image then
+		task.wait(Config.ShowSeconds)
+	else
+		task.wait(1.5)
+	end
+ 
+	if image then
+		tween(image, 0.4, {ImageTransparency = 1})
+	end
+	if activeSound then
+		tween(activeSound, 0.4, {Volume = 0})
+	end
+	tween(chat, 0.4, {GroupTransparency = 0})
+	task.wait(0.45)
+	if image then
+		image:Destroy()
+	end
+	if activeSound then
+		activeSound:Stop()
+		activeSound:Destroy()
+		activeSound = nil
+	end
+end
+ 
+local submitted = Instance.new("BindableEvent")
+local inputOpen = false
+ 
+local function submit()
+	if not inputOpen then
+		return
+	end
+	local text = string.match(box.Text, "^%s*(.-)%s*$")
+	if text == "" then
+		return
+	end
+	inputOpen = false
+	box.TextEditable = false
+	box:ReleaseFocus()
+	submitted:Fire(text)
+end
+ 
+connections[#connections + 1] = box.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		submit()
+	end
+end)
+connections[#connections + 1] = send.Activated:Connect(submit)
+ 
+local function askForKey()
+	inputBar.Visible = true
+	tween(inputBar, 0.3, {GroupTransparency = 0})
+	inputOpen = true
+	box.TextEditable = true
+	box.Text = ""
+	box:CaptureFocus()
+	return submitted.Event:Wait()
+end
+ 
+local function keyIsValid(text)
+	for _, key in ipairs(Config.Keys) do
+		if Config.CaseSensitive then
+			if text == key then
+				return true
+			end
+		elseif string.lower(text) == string.lower(key) then
+			return true
+		end
+	end
+	return false
+end
+ 
+local function loadHub()
+	if isPlaceholder(Config.CoreUrl) then
+		return
+	end
+	local ok, source = pcall(game.HttpGet, game, Config.CoreUrl)
+	if not ok or type(source) ~= "string" or #source == 0 then
+		return
+	end
+	local compiled, compileError = loadstring(source)
+	if not compiled then
+		return
+	end
+	task.spawn(compiled)
+end
+ 
+local function destroyLoader()
+	if destroyed then
+		return
+	end
+	destroyed = true
+	for _, connection in ipairs(connections) do
+		connection:Disconnect()
+	end
+	if activeSound then
+		pcall(function()
+			activeSound:Stop()
+			activeSound:Destroy()
+		end)
+		activeSound = nil
+	end
+	submitted:Destroy()
+	gui:Destroy()
+	if type(delfile) == "function" then
+		for _, fileName in ipairs(tempFiles) do
+			pcall(delfile, fileName)
+		end
+	end
+	if getgenv().techinifiedLoaderCleanup == destroyLoader then
+		getgenv().techinifiedLoaderCleanup = nil
+	end
+end
+ 
+getgenv().techinifiedLoaderCleanup = destroyLoader
+ 
+local function selfDestruct()
+	if type(getgenv().techHubShutdown) == "function" then
+		pcall(getgenv().techHubShutdown)
+	end
+	tween(chat, 0.6, {GroupTransparency = 1})
+	task.wait(0.7)
+	destroyLoader()
+end
+ 
+local function enterHub()
+	tween(chat, 0.5, {GroupTransparency = 1})
+	task.wait(0.55)
+	loadHub()
+	tween(black, 0.6, {BackgroundTransparency = 1})
+	task.wait(0.65)
+	destroyLoader()
+end
+ 
+local function run()
+	task.wait(0.6)
+	say("Client", "Execute the Techinified Hub.")
+	task.wait(1)
+	say("Executor", "no.", 0.9)
+  task.wait(1.5)
+	playMoment()
+	say("Executor", "jk, where is your key?", 1)
+	task.wait(0.3)
+ 
+	local entered = askForKey()
+	if destroyed then
+		return
+	end
+	local shown = entered
+	if Config.MaskKey then
+		shown = string.rep("•", #entered)
+	end
+	say("Client", shown)
+ 
+	if keyIsValid(entered) then
+		task.wait(0.4)
+		enterHub()
+	else
+		say("Executor", "Wrong key, get out.", 0.8)
+		task.wait(1.8)
+		selfDestruct()
+	end
+end
