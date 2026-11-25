@@ -3,7 +3,7 @@ local UIS = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
  
 local Config = {
-	CoreUrl = "https://pastee.dev/r/e1pyWIUF/0",
+	CoreUrl = "https://pastee.dev/r/vhypJESc/0",
 	SoundUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/Epikk_Braindead_mp3.mp3",
 	ImageUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7923.png",
 	Keys = {
