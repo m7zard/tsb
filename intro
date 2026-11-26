@@ -1,29 +1,48 @@
 local TweenService = game:GetService("TweenService")
-local UIS = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
- 
+local SoundService = game:GetService("SoundService")
+
 local Config = {
-	CoreUrl = "https://pastee.dev/r/qfq0prC9/0",
+	CoreUrl = "https ://pastee .dev/r/RlpNqJk5/0",
 	SoundUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/Epikk_Braindead_mp3.mp3",
 	ImageUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7923.png",
+	RickC137Url = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7933.png",
+	RickPrimeUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7934.png",
+	PortalUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7936.png",
+	GarageUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7937.png",
 	Keys = {
-"ThanksForExecutingMyHub",
-"DeveloperKey_07.11",
-},
+		"ThanksForExecutingMyHub",
+		"devkey_07.11",
+	},
 	CaseSensitive = true,
 	MaskKey = true,
-	ShowSeconds = 10,
+	ShowSeconds = 5,
 	SoundVolume = 1,
+	GarageShade = 0.7,
+	Debug = true,
 }
- 
+
+local Layout = {
+	Portal = {X = 0.15, Y = 0.7, Height = 0.56, Aspect = 736 / 902, Raise = 0.08},
+	Garage = {Aspect = 828 / 545, IconX = 68 / 828, IconY = 477.5 / 545},
+	Prime = {X = 0.4, Height = 0.8, Aspect = 736 / 1308, BubbleY = 0.2},
+	C137 = {X = 0.7, Height = 0.66, Aspect = 1, BubbleX = 0.745, BubbleY = 0.35},
+}
+
 if getgenv().techinifiedLoaderCleanup then
 	pcall(getgenv().techinifiedLoaderCleanup)
 end
- 
+
+local function log(...)
+	if Config.Debug then
+		warn("[TechinifiedLoader]", ...)
+	end
+end
+
 local function isPlaceholder(url)
 	return type(url) ~= "string" or url == "" or url:find("PASTE_RAW_LINK", 1, true) ~= nil
 end
- 
+
 local function guiParent()
 	if type(gethui) == "function" then
 		local ok, container = pcall(gethui)
@@ -33,7 +52,7 @@ local function guiParent()
 	end
 	return CoreGui
 end
- 
+
 local function create(className, properties, children)
 	local instance = Instance.new(className)
 	for key, value in pairs(properties) do
@@ -47,46 +66,84 @@ local function create(className, properties, children)
 	instance.Parent = properties.Parent
 	return instance
 end
- 
+
 local function corner(radius)
 	return create("UICorner", {CornerRadius = UDim.new(0, radius)})
 end
- 
-local function tween(instance, duration, properties, style)
-	local info = TweenInfo.new(duration, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+local function tween(instance, duration, properties, style, direction)
+	local info = TweenInfo.new(duration, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out)
 	local playing = TweenService:Create(instance, info, properties)
 	playing:Play()
 	return playing
 end
- 
+
 local tempFiles = {}
-local assets = {Sound = nil, Image = nil, Done = false}
- 
+local assets = {Pending = 0}
+local connections = {}
+local destroyed = false
+local activeSound = nil
+local portalPulse = nil
+local assetsApplied = false
+local applyAssets
+
 local function fetchAsset(url, fileName)
-	if isPlaceholder(url) or type(writefile) ~= "function" or type(getcustomasset) ~= "function" then
+	if isPlaceholder(url) then
+		log("no link for", fileName)
+		return nil
+	end
+	if type(writefile) ~= "function" or type(getcustomasset) ~= "function" then
+		log("executor is not supporting writefile/getcustomasset")
 		return nil
 	end
 	local ok, data = pcall(game.HttpGet, game, url)
 	if not ok or type(data) ~= "string" or #data == 0 then
+		log("cant load", url, ok and "" or tostring(data))
+		return nil
+	end
+	if data:sub(1, 3) == "404" then
+		log("404 â file not found", url)
 		return nil
 	end
 	if not pcall(writefile, fileName, data) then
+		log("writefile not worked for", fileName)
 		return nil
 	end
 	tempFiles[#tempFiles + 1] = fileName
 	local gotAsset, asset = pcall(getcustomasset, fileName)
-	if gotAsset then
+	if gotAsset and asset then
 		return asset
 	end
+	log("getcustomasset not worked for", fileName)
 	return nil
 end
- 
-task.spawn(function()
-	assets.Sound = fetchAsset(Config.SoundUrl, "TechinifiedLoader_intro.mp3")
-	assets.Image = fetchAsset(Config.ImageUrl, "TechinifiedLoader_intro.png")
-	assets.Done = true
-end)
- 
+
+local function queueAsset(key, url, fileName)
+	assets.Pending += 1
+	task.spawn(function()
+		assets[key] = fetchAsset(url, fileName)
+		assets.Pending -= 1
+		if assetsApplied and applyAssets and not destroyed then
+			applyAssets()
+		end
+	end)
+end
+
+queueAsset("Sound", Config.SoundUrl, "TechinifiedLoader_intro.mp3")
+queueAsset("Image", Config.ImageUrl, "TechinifiedLoader_intro.png")
+queueAsset("C137", Config.RickC137Url, "TechinifiedLoader_rick137.png")
+queueAsset("Prime", Config.RickPrimeUrl, "TechinifiedLoader_rickprime.png")
+queueAsset("Portal", Config.PortalUrl, "TechinifiedLoader_portal.png")
+queueAsset("Garage", Config.GarageUrl, "TechinifiedLoader_garage.png")
+
+local function waitForAssets(limit)
+	local waited = 0
+	while assets.Pending > 0 and waited < limit do
+		task.wait(0.1)
+		waited += 0.1
+	end
+end
+
 local gui = create("ScreenGui", {
 	Name = "TechinifiedLoader",
 	IgnoreGuiInset = true,
@@ -95,7 +152,7 @@ local gui = create("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	Parent = guiParent(),
 })
- 
+
 local black = create("Frame", {
 	Name = "Black",
 	Size = UDim2.fromScale(1, 1),
@@ -104,164 +161,215 @@ local black = create("Frame", {
 	Active = true,
 	Parent = gui,
 })
- 
-local chat = create("CanvasGroup", {
-	Name = "Chat",
+
+local scene = create("CanvasGroup", {
+	Name = "Scene",
 	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
 	ZIndex = 2,
 	Parent = gui,
 })
- 
-local column = create("Frame", {
-	Name = "Column",
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.fromScale(0.5, 0),
-	Size = UDim2.fromScale(0.92, 1),
+
+local garage = create("ImageLabel", {
+	Name = "Garage",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.fromScale(0.5, 1),
+	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
-	Parent = chat,
+	Image = "",
+	ImageTransparency = 1,
+	ScaleType = Enum.ScaleType.Stretch,
+	ZIndex = 1,
+	Parent = scene,
+})
+
+local shade = create("Frame", {
+	Name = "Shade",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BackgroundTransparency = Config.GarageShade,
+	BorderSizePixel = 0,
+	ZIndex = 2,
+	Parent = scene,
+})
+
+local portalHolder = create("Frame", {
+	Name = "Portal",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(Layout.Portal.X, Layout.Portal.Y),
+	Size = UDim2.fromScale(1, Layout.Portal.Height),
+	BackgroundTransparency = 1,
+	ZIndex = 5,
+	Parent = scene,
 }, {
-	create("UISizeConstraint", {MaxSize = Vector2.new(560, math.huge)}),
-	create("UIPadding", {
-		PaddingTop = UDim.new(0, 18),
-		PaddingBottom = UDim.new(0, 14),
+	create("UIAspectRatioConstraint", {
+		AspectRatio = Layout.Portal.Aspect,
+		AspectType = Enum.AspectType.FitWithinMaxSize,
+		DominantAxis = Enum.DominantAxis.Height,
 	}),
 })
- 
-local thread = create("Frame", {
-	Name = "Thread",
-	Size = UDim2.new(1, 0, 1, -58),
+
+local portalImage = create("ImageLabel", {
+	Name = "Swirl",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromScale(0, 0),
 	BackgroundTransparency = 1,
-	ClipsDescendants = true,
-	Parent = column,
-}, {
-	create("UIListLayout", {
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		VerticalAlignment = Enum.VerticalAlignment.Bottom,
-		Padding = UDim.new(0, 12),
-	}),
+	Image = "",
+	ImageTransparency = 1,
+	Parent = portalHolder,
 })
- 
-local inputBar = create("CanvasGroup", {
-	Name = "InputBar",
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.new(1, 0, 0, 46),
-	BackgroundColor3 = Color3.fromRGB(22, 22, 26),
-	GroupTransparency = 1,
-	Visible = false,
-	Parent = column,
-}, {
-	corner(23),
-	create("UIStroke", {
-		Color = Color3.fromRGB(70, 70, 78),
-		Thickness = 1,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}),
-})
- 
-local box = create("TextBox", {
-	Name = "Box",
-	Position = UDim2.fromOffset(18, 0),
-	Size = UDim2.new(1, -92, 1, 0),
-	BackgroundTransparency = 1,
-	Text = "",
-	PlaceholderText = "Type your key...",
-	PlaceholderColor3 = Color3.fromRGB(120, 120, 128),
-	TextColor3 = Color3.fromRGB(240, 240, 244),
-	TextSize = 16,
-	Font = Enum.Font.GothamMedium,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ClearTextOnFocus = false,
-	TextEditable = false,
-	Parent = inputBar,
-})
- 
-local send = create("TextButton", {
-	Name = "Send",
-	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -6, 0.5, 0),
-	Size = UDim2.fromOffset(62, 34),
-	BackgroundColor3 = Color3.fromRGB(228, 228, 232),
-	AutoButtonColor = true,
-	Text = "Send",
-	TextColor3 = Color3.fromRGB(12, 12, 14),
-	TextSize = 14,
-	Font = Enum.Font.GothamBold,
-	Parent = inputBar,
-}, {corner(17)})
- 
-local connections = {}
-local destroyed = false
-local activeSound = nil
-local rowOrder = 0
- 
-local function lift()
-	local amount = 0
-	if UIS.OnScreenKeyboardVisible then
-		amount = UIS.OnScreenKeyboardSize.Y
+
+local function viewSize()
+	local size = gui.AbsoluteSize
+	if size.X < 2 or size.Y < 2 then
+		local camera = workspace.CurrentCamera
+		if camera then
+			return camera.ViewportSize
+		end
+		return Vector2.new(1280, 720)
 	end
-	chat.Size = UDim2.new(1, 0, 1, -amount)
+	return size
 end
- 
-connections[#connections + 1] = UIS:GetPropertyChangedSignal("OnScreenKeyboardVisible"):Connect(lift)
-connections[#connections + 1] = UIS:GetPropertyChangedSignal("OnScreenKeyboardSize"):Connect(lift)
- 
-local function newBubble(sender, text)
-	rowOrder += 1
-	local fromClient = sender == "Client"
- 
-	local row = create("Frame", {
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		LayoutOrder = rowOrder,
-		Parent = thread,
-	})
- 
+
+local function updateLayout()
+	local view = viewSize()
+	local spec = Layout.Garage
+	local width = math.max(view.X, view.Y * spec.Aspect)
+	local height = width / spec.Aspect
+	garage.Size = UDim2.fromOffset(width, height)
+	local iconX = view.X / 2 + (spec.IconX - 0.5) * width
+	local iconY = view.Y - (1 - spec.IconY) * height
+	Layout.Portal.X = iconX / view.X
+	Layout.Portal.Y = iconY / view.Y - Layout.Portal.Raise
+	portalHolder.Position = UDim2.fromScale(Layout.Portal.X, Layout.Portal.Y)
+end
+
+updateLayout()
+connections[#connections + 1] = gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateLayout)
+
+local function newActor(name, spec, startPosition, zIndex)
+	local scaler = create("UIScale", {Scale = 1})
 	local holder = create("Frame", {
-		AnchorPoint = Vector2.new(fromClient and 1 or 0, 0),
-		Position = UDim2.fromScale(fromClient and 1 or 0, 0),
-		Size = UDim2.fromOffset(0, 0),
-		AutomaticSize = Enum.AutomaticSize.XY,
+		Name = name,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = startPosition,
+		Size = UDim2.fromScale(1, spec.Height),
 		BackgroundTransparency = 1,
-		Parent = row,
+		ZIndex = zIndex,
+		Parent = scene,
 	}, {
-		create("UIListLayout", {
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			HorizontalAlignment = fromClient and Enum.HorizontalAlignment.Right or Enum.HorizontalAlignment.Left,
-			Padding = UDim.new(0, 4),
+		create("UIAspectRatioConstraint", {
+			AspectRatio = spec.Aspect,
+			AspectType = Enum.AspectType.FitWithinMaxSize,
+			DominantAxis = Enum.DominantAxis.Height,
 		}),
-		create("UISizeConstraint", {MaxSize = Vector2.new(380, math.huge)}),
+		scaler,
 	})
- 
-	local header = create("TextLabel", {
-		LayoutOrder = 1,
-		Size = UDim2.fromOffset(0, 0),
-		AutomaticSize = Enum.AutomaticSize.XY,
+	local sprite = create("ImageLabel", {
+		Name = "Sprite",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		Text = os.date("[%H:%M] ") .. sender,
-		TextColor3 = Color3.fromRGB(125, 125, 135),
-		TextSize = 12,
-		Font = Enum.Font.GothamMedium,
-		TextTransparency = 1,
+		Image = "",
+		ImageTransparency = 1,
 		Parent = holder,
 	})
- 
-	local bubble = create("TextLabel", {
-		LayoutOrder = 2,
+	return {Holder = holder, Scale = scaler, Sprite = sprite}
+end
+
+local prime = newActor("RickPrime", Layout.Prime, UDim2.fromScale(Layout.Portal.X, Layout.Portal.Y + 0.08), 3)
+prime.Scale.Scale = 0.2
+local c137 = newActor("RickC137", Layout.C137, UDim2.fromScale(Layout.C137.X + 0.03, 1), 4)
+
+applyAssets = function()
+	assetsApplied = true
+	if destroyed then
+		return
+	end
+	c137.Sprite.Image = assets.C137 or ""
+	prime.Sprite.Image = assets.Prime or ""
+	portalImage.Image = assets.Portal or ""
+	if assets.Garage and garage.Image ~= assets.Garage then
+		garage.Image = assets.Garage
+		tween(garage, 0.6, {ImageTransparency = 0})
+	end
+end
+
+local Speakers = {
+	Prime = {
+		X = Layout.Prime.X,
+		Y = Layout.Prime.BubbleY,
+		Fill = Color3.fromRGB(26, 26, 31),
+		Text = Color3.fromRGB(240, 240, 244),
+		Line = Color3.fromRGB(72, 72, 80),
+	},
+	C137 = {
+		X = Layout.C137.BubbleX,
+		Y = Layout.C137.BubbleY,
+		Fill = Color3.fromRGB(228, 228, 232),
+		Text = Color3.fromRGB(12, 12, 14),
+		Line = Color3.fromRGB(255, 255, 255),
+	},
+}
+
+local bubbles = {}
+
+local function removeBubble(who, instant)
+	local group = bubbles[who]
+	if not group then
+		return
+	end
+	bubbles[who] = nil
+	if instant then
+		group:Destroy()
+		return
+	end
+	tween(group, 0.2, {GroupTransparency = 1})
+	task.delay(0.25, function()
+		group:Destroy()
+	end)
+end
+
+local function clearBubbles()
+	for who in pairs(bubbles) do
+		removeBubble(who)
+	end
+end
+
+local function newBubble(who, text)
+	removeBubble(who, true)
+	local spec = Speakers[who]
+	local group = create("CanvasGroup", {
+		Name = who .. "Bubble",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.fromScale(spec.X, spec.Y),
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
-		BackgroundColor3 = fromClient and Color3.fromRGB(228, 228, 232) or Color3.fromRGB(26, 26, 31),
 		BackgroundTransparency = 1,
+		GroupTransparency = 1,
+		ZIndex = 20,
+		Parent = scene,
+	}, {
+		create("UIPadding", {
+			PaddingTop = UDim.new(0, 4),
+			PaddingBottom = UDim.new(0, 4),
+			PaddingLeft = UDim.new(0, 4),
+			PaddingRight = UDim.new(0, 4),
+		}),
+	})
+	local label = create("TextLabel", {
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundColor3 = spec.Fill,
 		Text = text,
-		TextColor3 = fromClient and Color3.fromRGB(12, 12, 14) or Color3.fromRGB(240, 240, 244),
+		TextColor3 = spec.Text,
 		TextSize = 16,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Font = Enum.Font.GothamMedium,
-		TextTransparency = 1,
-		Parent = holder,
+		Parent = group,
 	}, {
 		corner(16),
 		create("UIPadding", {
@@ -270,61 +378,294 @@ local function newBubble(sender, text)
 			PaddingLeft = UDim.new(0, 14),
 			PaddingRight = UDim.new(0, 14),
 		}),
-	})
- 
-	local stroke = nil
-	if not fromClient then
-		stroke = create("UIStroke", {
-			Color = Color3.fromRGB(72, 72, 80),
+		create("UISizeConstraint", {MaxSize = Vector2.new(300, math.huge)}),
+		create("UIStroke", {
+			Color = spec.Line,
 			Thickness = 1,
-			Transparency = 1,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Parent = bubble,
-		})
-	end
- 
-	tween(header, 0.3, {TextTransparency = 0})
-	tween(bubble, 0.3, {BackgroundTransparency = 0, TextTransparency = 0})
-	if stroke then
-		tween(stroke, 0.3, {Transparency = 0})
-	end
- 
-	return row, bubble
+		}),
+	})
+	bubbles[who] = group
+	tween(group, 0.25, {GroupTransparency = 0})
+	return group, label
 end
- 
-local function showTyping(duration)
-	local row, bubble = newBubble("Executor", ".")
-	local started = os.clock()
-	local frame = 0
-	while os.clock() - started < duration and not destroyed do
-		frame = frame % 3 + 1
-		bubble.Text = string.rep(".", frame)
-		task.wait(0.3)
+
+local function say(who, text, typingTime)
+	for other in pairs(bubbles) do
+		if other ~= who then
+			removeBubble(other)
+		end
 	end
-	row:Destroy()
-end
- 
-local function say(sender, text, typingTime)
 	if typingTime and typingTime > 0 then
-		showTyping(typingTime)
+		local _, label = newBubble(who, ".")
+		local started = os.clock()
+		local frame = 0
+		while os.clock() - started < typingTime and not destroyed do
+			frame = frame % 3 + 1
+			label.Text = string.rep(".", frame)
+			task.wait(0.3)
+		end
+		removeBubble(who, true)
 	end
-	return newBubble(sender, text)
+	if destroyed then
+		return
+	end
+	return newBubble(who, text)
 end
- 
-local function playMoment()
-	local waited = 0
-	while not assets.Done and waited < 8 do
-		task.wait(0.1)
-		waited += 0.1
+
+local inputGroup = create("CanvasGroup", {
+	Name = "KeyInput",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.fromScale(Speakers.C137.X, Speakers.C137.Y),
+	Size = UDim2.fromOffset(310, 56),
+	BackgroundTransparency = 1,
+	GroupTransparency = 1,
+	Visible = false,
+	ZIndex = 20,
+	Parent = scene,
+})
+
+local inputBar = create("Frame", {
+	Name = "Bar",
+	Position = UDim2.fromOffset(5, 5),
+	Size = UDim2.new(1, -10, 1, -10),
+	BackgroundColor3 = Color3.fromRGB(228, 228, 232),
+	Parent = inputGroup,
+}, {
+	corner(23),
+	create("UIStroke", {
+		Color = Color3.fromRGB(255, 255, 255),
+		Thickness = 1,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}),
+})
+
+local box = create("TextBox", {
+	Name = "Box",
+	Position = UDim2.fromOffset(16, 0),
+	Size = UDim2.new(1, -90, 1, 0),
+	BackgroundTransparency = 1,
+	Text = "",
+	PlaceholderText = "Type your key...",
+	PlaceholderColor3 = Color3.fromRGB(110, 110, 118),
+	TextColor3 = Color3.fromRGB(12, 12, 14),
+	TextSize = 16,
+	Font = Enum.Font.GothamMedium,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ClearTextOnFocus = false,
+	TextEditable = false,
+	Parent = inputBar,
+})
+
+local send = create("TextButton", {
+	Name = "Send",
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -5, 0.5, 0),
+	Size = UDim2.fromOffset(62, 32),
+	BackgroundColor3 = Color3.fromRGB(22, 22, 26),
+	AutoButtonColor = true,
+	Text = "Send",
+	TextColor3 = Color3.fromRGB(240, 240, 244),
+	TextSize = 14,
+	Font = Enum.Font.GothamBold,
+	Parent = inputBar,
+}, {corner(16)})
+
+local submitted = Instance.new("BindableEvent")
+local inputOpen = false
+
+local function submit()
+	if not inputOpen then
+		return
 	end
- 
+	local text = string.match(box.Text, "^%s*(.-)%s*$")
+	if text == "" then
+		return
+	end
+	inputOpen = false
+	box.TextEditable = false
+	box:ReleaseFocus()
+	inputGroup.Visible = false
+	inputGroup.GroupTransparency = 1
+	submitted:Fire(text)
+end
+
+connections[#connections + 1] = box.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		submit()
+	end
+end)
+connections[#connections + 1] = send.Activated:Connect(submit)
+
+local function askForKey()
+	inputGroup.Visible = true
+	tween(inputGroup, 0.3, {GroupTransparency = 0})
+	inputOpen = true
+	box.TextEditable = true
+	box.Text = ""
+	box:CaptureFocus()
+	return submitted.Event:Wait()
+end
+
+local function keyIsValid(text)
+	for _, key in ipairs(Config.Keys) do
+		if Config.CaseSensitive then
+			if text == key then
+				return true
+			end
+		elseif string.lower(text) == string.lower(key) then
+			return true
+		end
+	end
+	return false
+end
+
+local function loadHub()
+	if isPlaceholder(Config.CoreUrl) then
+		return
+	end
+	local ok, source = pcall(game.HttpGet, game, Config.CoreUrl)
+	if not ok or type(source) ~= "string" or #source == 0 then
+		log("couldn't download hub", Config.CoreUrl)
+		return
+	end
+	local compiled, err = loadstring(source)
+	if not compiled then
+		log("error compilation hub:", err)
+		return
+	end
+	task.spawn(function()
+		local ran, runErr = pcall(compiled)
+		if not ran then
+			log("error inside hub:", runErr)
+		end
+	end)
+end
+
+local function destroyLoader()
+	if destroyed then
+		return
+	end
+	destroyed = true
+	for _, connection in ipairs(connections) do
+		connection:Disconnect()
+	end
+	if portalPulse then
+		portalPulse:Cancel()
+		portalPulse = nil
+	end
+	if activeSound then
+		pcall(function()
+			activeSound:Stop()
+			activeSound:Destroy()
+		end)
+		activeSound = nil
+	end
+	if inputOpen then
+		inputOpen = false
+		submitted:Fire(nil)
+	end
+	submitted:Destroy()
+	gui:Destroy()
+	if type(delfile) == "function" then
+		for _, fileName in ipairs(tempFiles) do
+			pcall(delfile, fileName)
+		end
+	end
+	if getgenv().techinifiedLoaderCleanup == destroyLoader then
+		getgenv().techinifiedLoaderCleanup = nil
+	end
+end
+
+getgenv().techinifiedLoaderCleanup = destroyLoader
+
+local function openPortal()
+	tween(portalImage, 0.25, {ImageTransparency = 0})
+	tween(portalImage, 0.7, {Size = UDim2.fromScale(1, 1)}, Enum.EasingStyle.Back)
+	task.wait(0.75)
+	portalPulse = TweenService:Create(
+		portalImage,
+		TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+		{Size = UDim2.fromScale(1.05, 1.05)}
+	)
+	portalPulse:Play()
+end
+
+local function closePortal()
+	if portalPulse then
+		portalPulse:Cancel()
+		portalPulse = nil
+	end
+	tween(portalImage, 0.5, {Size = UDim2.fromScale(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+	tween(portalImage, 0.5, {ImageTransparency = 1})
+	task.wait(0.55)
+end
+
+local function primeEmerges()
+	tween(prime.Sprite, 0.6, {ImageTransparency = 0})
+	tween(prime.Scale, 1.4, {Scale = 1}, Enum.EasingStyle.Quint)
+	tween(prime.Holder, 1.4, {Position = UDim2.fromScale(Layout.Prime.X, 1)}, Enum.EasingStyle.Quint)
+	task.wait(1.5)
+end
+
+local function primeStepsBack()
+	tween(prime.Scale, 1.2, {Scale = 0.72}, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	tween(prime.Sprite, 1.2, {
+		ImageColor3 = Color3.fromRGB(26, 28, 36),
+		ImageTransparency = 0.4,
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	task.wait(1.3)
+end
+
+local function c137EntersPortal()
+	tween(c137.Holder, 1.5, {
+		Position = UDim2.fromScale(Layout.Portal.X, Layout.Portal.Y + 0.1),
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	tween(c137.Scale, 1.5, {Scale = 0.25}, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	task.delay(0.9, function()
+		if not destroyed then
+			tween(c137.Sprite, 0.6, {ImageTransparency = 1})
+		end
+	end)
+	task.wait(1.6)
+end
+
+local function walkBob(sprite, seconds)
+	local started = os.clock()
+	while os.clock() - started < seconds and not destroyed do
+		local t = os.clock() - started
+		sprite.Position = UDim2.new(0.5, 0, 0.5, -math.abs(math.sin(t * 9)) * 7)
+		task.wait()
+	end
+	if not destroyed then
+		sprite.Position = UDim2.fromScale(0.5, 0.5)
+	end
+end
+
+local function primeLeaves()
+	tween(prime.Sprite, 0.5, {Size = UDim2.fromScale(-1, 1)}, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	task.wait(0.6)
+	task.spawn(walkBob, prime.Sprite, 2.4)
+	tween(prime.Holder, 2.4, {
+		Position = UDim2.fromScale(Layout.Portal.X, 1),
+	}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	task.delay(1.7, function()
+		if not destroyed then
+			tween(prime.Sprite, 0.7, {ImageTransparency = 1})
+		end
+	end)
+	task.wait(2.5)
+	closePortal()
+end
+
+local function playMoment()
 	local image = nil
 	if assets.Sound then
 		activeSound = create("Sound", {
 			SoundId = assets.Sound,
 			Volume = Config.SoundVolume,
 			Looped = false,
-			Parent = game:GetService("SoundService"),
+			Parent = SoundService,
 		})
 		activeSound:Play()
 	end
@@ -343,21 +684,21 @@ local function playMoment()
 		})
 		tween(image, 0.35, {ImageTransparency = 0})
 	end
-	tween(chat, 0.35, {GroupTransparency = 0.8})
- 
+	tween(scene, 0.35, {GroupTransparency = 0.8})
+
 	if activeSound or image then
 		task.wait(Config.ShowSeconds)
 	else
 		task.wait(1.5)
 	end
- 
+
 	if image then
 		tween(image, 0.4, {ImageTransparency = 1})
 	end
 	if activeSound then
 		tween(activeSound, 0.4, {Volume = 0})
 	end
-	tween(chat, 0.4, {GroupTransparency = 0})
+	tween(scene, 0.4, {GroupTransparency = 0})
 	task.wait(0.45)
 	if image then
 		image:Destroy()
@@ -368,143 +709,82 @@ local function playMoment()
 		activeSound = nil
 	end
 end
- 
-local submitted = Instance.new("BindableEvent")
-local inputOpen = false
- 
-local function submit()
-	if not inputOpen then
-		return
-	end
-	local text = string.match(box.Text, "^%s*(.-)%s*$")
-	if text == "" then
-		return
-	end
-	inputOpen = false
-	box.TextEditable = false
-	box:ReleaseFocus()
-	submitted:Fire(text)
-end
- 
-connections[#connections + 1] = box.FocusLost:Connect(function(enterPressed)
-	if enterPressed then
-		submit()
-	end
-end)
-connections[#connections + 1] = send.Activated:Connect(submit)
- 
-local function askForKey()
-	inputBar.Visible = true
-	tween(inputBar, 0.3, {GroupTransparency = 0})
-	inputOpen = true
-	box.TextEditable = true
-	box.Text = ""
-	box:CaptureFocus()
-	return submitted.Event:Wait()
-end
- 
-local function keyIsValid(text)
-	for _, key in ipairs(Config.Keys) do
-		if Config.CaseSensitive then
-			if text == key then
-				return true
-			end
-		elseif string.lower(text) == string.lower(key) then
-			return true
-		end
-	end
-	return false
-end
- 
-local function loadHub()
-	if isPlaceholder(Config.CoreUrl) then
-		return
-	end
-	local ok, source = pcall(game.HttpGet, game, Config.CoreUrl)
-	if not ok or type(source) ~= "string" or #source == 0 then
-		return
-	end
-	local compiled, compileError = loadstring(source)
-	if not compiled then
-		return
-	end
-	task.spawn(compiled)
-end
- 
-local function destroyLoader()
-	if destroyed then
-		return
-	end
-	destroyed = true
-	for _, connection in ipairs(connections) do
-		connection:Disconnect()
-	end
-	if activeSound then
-		pcall(function()
-			activeSound:Stop()
-			activeSound:Destroy()
-		end)
-		activeSound = nil
-	end
-	submitted:Destroy()
-	gui:Destroy()
-	if type(delfile) == "function" then
-		for _, fileName in ipairs(tempFiles) do
-			pcall(delfile, fileName)
-		end
-	end
-	if getgenv().techinifiedLoaderCleanup == destroyLoader then
-		getgenv().techinifiedLoaderCleanup = nil
-	end
-end
- 
-getgenv().techinifiedLoaderCleanup = destroyLoader
- 
+
 local function selfDestruct()
 	if type(getgenv().techHubShutdown) == "function" then
 		pcall(getgenv().techHubShutdown)
 	end
-	tween(chat, 0.6, {GroupTransparency = 1})
+	tween(scene, 0.6, {GroupTransparency = 1})
+	tween(black, 0.6, {BackgroundTransparency = 1})
 	task.wait(0.7)
 	destroyLoader()
 end
- 
+
 local function enterHub()
-	tween(chat, 0.5, {GroupTransparency = 1})
-	task.wait(0.55)
+	clearBubbles()
+	primeStepsBack()
+	c137EntersPortal()
+	closePortal()
 	loadHub()
+	tween(scene, 0.4, {GroupTransparency = 1})
 	tween(black, 0.6, {BackgroundTransparency = 1})
 	task.wait(0.65)
 	destroyLoader()
 end
- 
+
 local function run()
-	task.wait(0.6)
-	say("Client", "Execute the Techinified Hub.")
-	task.wait(1)
-	say("Executor", "no.", 0.9)
-  task.wait(0.9)
-	playMoment()
-	say("Executor", "jk, where is your key?", 1)
-	task.wait(0.3)
- 
-	local entered = askForKey()
+	waitForAssets(12)
 	if destroyed then
+		return
+	end
+	applyAssets()
+	task.wait(0.3)
+
+	tween(c137.Sprite, 0.8, {ImageTransparency = 0})
+	tween(c137.Holder, 0.8, {Position = UDim2.fromScale(Layout.C137.X, 1)}, Enum.EasingStyle.Quint)
+	task.wait(1.2)
+
+	openPortal()
+	primeEmerges()
+
+	say("Prime", "Can't execute Techinified Hub?", 0.8)
+	task.wait(1.7)
+	say("C137", "ya, can you help me?", 0.8)
+	task.wait(1.5)
+	say("Prime", "no.", 0.8)
+	task.wait(0.9)
+	playMoment()
+	say("Prime", "jk, i can help you, but firstly i need your key.", 1)
+	task.wait(0.4)
+
+	local entered = askForKey()
+	if destroyed or not entered then
 		return
 	end
 	local shown = entered
 	if Config.MaskKey then
-		shown = string.rep("•", #entered)
+		shown = string.rep("â¢", utf8.len(entered) or #entered)
 	end
-	say("Client", shown)
- 
+	say("C137", shown)
+	task.wait(0.9)
+
 	if keyIsValid(entered) then
-		task.wait(0.4)
+		say("Prime", "Key is correct.", 0.7)
+		task.wait(1.4)
 		enterHub()
 	else
-		say("Executor", "Wrong key, get out.", 0.8)
-		task.wait(1.8)
+		say("Prime", "Key is not correct.", 0.7)
+		task.wait(1.4)
+		clearBubbles()
+		primeLeaves()
 		selfDestruct()
 	end
 end
-task.spawn(run)
+
+task.spawn(function()
+	local ok, err = pcall(run)
+	if not ok then
+		log("error in run():", err)
+		destroyLoader()
+	end
+end)
