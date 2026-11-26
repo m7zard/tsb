@@ -3,7 +3,7 @@ local CoreGui = game:GetService("CoreGui")
 local SoundService = game:GetService("SoundService")
 
 local Config = {
-	CoreUrl = "https ://pastee .dev/r/RlpNqJk5/0",
+	CoreUrl = "https://pastee.dev/r/RlpNqJk5/0",
 	SoundUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/Epikk_Braindead_mp3.mp3",
 	ImageUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7923.png",
 	RickC137Url = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/IMG_7933.png",
