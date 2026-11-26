@@ -1,7 +1,3 @@
-local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
-local SoundService = game:GetService("SoundService")
-
 local Config = {
 	CoreUrl = "https://pastee.dev/r/RlpNqJk5/0",
 	SoundUrl = "https://raw.githubusercontent.com/m7za1/tsbg/refs/heads/main/images/Epikk_Braindead_mp3.mp3",
@@ -50,7 +46,7 @@ local function guiParent()
 			return container
 		end
 	end
-	return CoreGui
+	return game:GetService("CoreGui")
 end
 
 local function create(className, properties, children)
@@ -73,7 +69,7 @@ end
 
 local function tween(instance, duration, properties, style, direction)
 	local info = TweenInfo.new(duration, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out)
-	local playing = TweenService:Create(instance, info, properties)
+	local playing = game:GetService("TweenService"):Create(instance, info, properties)
 	playing:Play()
 	return playing
 end
@@ -583,7 +579,7 @@ local function openPortal()
 	tween(portalImage, 0.25, {ImageTransparency = 0})
 	tween(portalImage, 0.7, {Size = UDim2.fromScale(1, 1)}, Enum.EasingStyle.Back)
 	task.wait(0.75)
-	portalPulse = TweenService:Create(
+	portalPulse = game:GetService("TweenService"):Create(
 		portalImage,
 		TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
 		{Size = UDim2.fromScale(1.05, 1.05)}
@@ -665,7 +661,7 @@ local function playMoment()
 			SoundId = assets.Sound,
 			Volume = Config.SoundVolume,
 			Looped = false,
-			Parent = SoundService,
+			Parent = game:GetService("SoundService"),
 		})
 		activeSound:Play()
 	end
